@@ -137,6 +137,11 @@ public class ExtensionTcpClient : IDisposable
         return null;
     }
 
+    public bool Subscribe<T>(Action<T> action) =>
+        _serializer!.Subscribe(action);
+    public bool Unsubscribe<T>(Action<T> action) =>
+        _serializer!.Unsubscribe(action);
+
     public bool CloseHandler<TAccept>(EventHandler<TAccept> handler)
     {
         return _serializer!.Unsubscribe<TAccept>(handler.OnAccept);
