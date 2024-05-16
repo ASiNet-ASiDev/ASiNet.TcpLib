@@ -116,10 +116,12 @@ public class ExtensionTcpClient : IDisposable
     }
 
 
-    public bool OpenHandler<TSend, TAccept>()
+    public PackageHandler<TSend, TAccept>? OpenHandler<TSend, TAccept>()
     {
         var h = new PackageHandler<TSend, TAccept>(this);
-        return _serializer!.Subscribe<TAccept>(h.OnAccept);
+        if(_serializer!.Subscribe<TAccept>(h.OnAccept))
+            return h;
+        return null;
     }
 
     public bool CloseHandler<TSend, TAccept>(PackageHandler<TSend, TAccept> handler)
@@ -127,10 +129,12 @@ public class ExtensionTcpClient : IDisposable
         return _serializer!.Unsubscribe<TAccept>(handler.OnAccept);
     }
 
-    public bool OpenHandler<TAccept>()
+    public EventHandler<TAccept>? OpenHandler<TAccept>()
     {
         var h = new EventHandler<TAccept>(this);
-        return _serializer!.Subscribe<TAccept>(h.OnAccept);
+        if(_serializer!.Subscribe<TAccept>(h.OnAccept))
+            return h;
+        return null;
     }
 
     public bool CloseHandler<TAccept>(EventHandler<TAccept> handler)

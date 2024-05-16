@@ -4,6 +4,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>0.0.1</Version>
+    <RepositoryUrl>https://github.com/ASiNet-ASiDev/ASiNet.TcpLib</RepositoryUrl>
+    <Copyright>MIT</Copyright>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Authors>ASiDev</Authors>
   </PropertyGroup>
 
   <ItemGroup>
