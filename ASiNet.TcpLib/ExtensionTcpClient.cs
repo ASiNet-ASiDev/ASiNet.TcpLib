@@ -29,6 +29,7 @@ public class ExtensionTcpClient : IDisposable
         _serializer = (Serializer<ushort>)builder.Build();
         _client = client;
         _stream = client.GetStream();
+        _ = Acceptor();
     }
 
     public event Action? ClientConnected;
