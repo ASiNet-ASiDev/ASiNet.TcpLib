@@ -1,8 +1,10 @@
 ﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using ASiNet.Data.Serialization.V2;
 using ASiNet.Data.Serialization.V2.Extensions;
 using ASiNet.Data.Serialization.V2.IO;
+using ASiNet.TcpLib.FileTransfer;
 
 namespace ASiNet.TcpLib;
 
@@ -13,7 +15,9 @@ public class ExtensionTcpClient : IDisposable
         var builder = new SerializerBuilder<ushort>()
             .AllowRecursiveTypeDeconstruction()
             .SetIndexer(new SerializerIndexer())
-            .RegisterBaseTypes();
+            .RegisterBaseTypes()
+            .RegisterType<PostFileRequest>()
+            .RegisterType<PostFileResponse>();
         registerTypes.Invoke(builder);
         _serializer = (Serializer<ushort>)builder.Build();
         _serializer.SubscribeTypeNotFound(OnTypeNotFound);
@@ -24,7 +28,9 @@ public class ExtensionTcpClient : IDisposable
         var builder = new SerializerBuilder<ushort>()
             .AllowRecursiveTypeDeconstruction()
             .SetIndexer(new SerializerIndexer())
-            .RegisterBaseTypes();
+            .RegisterBaseTypes()
+            .RegisterType<PostFileRequest>()
+            .RegisterType<PostFileResponse>();
         registerTypes.Invoke(builder);
         _serializer = (Serializer<ushort>)builder.Build();
         _client = client;
@@ -38,17 +44,22 @@ public class ExtensionTcpClient : IDisposable
     public event Action<Type>? SendNotRegisterType;
     public event Action<object?>? TypeNotRegister;
 
+    public string? Address => (_client?.Client.LocalEndPoint as IPEndPoint)?.Address.ToString();
+    public int? Port => (_client?.Client.LocalEndPoint as IPEndPoint)?.Port;
+    public IPEndPoint? LocalEndPoint => _client?.Client.LocalEndPoint as IPEndPoint;
+    public IPEndPoint? RemoteEndPoint => _client?.Client.RemoteEndPoint as IPEndPoint;
+
     public int UpdateDelay { get; set; } = 50;
 
     public bool Connected => IsConnectedCheck();
+
+    public Serializer<ushort>? CurrentSerializer => _serializer;
 
     private Serializer<ushort>? _serializer;
     private TcpClient? _client;
     private NetworkStream? _stream;
 
     private readonly object _lock = new();
-
-    private CancellationTokenSource? _acceptorCts;
 
     public async Task<bool> Connect(string address, int port)
     {
@@ -63,14 +74,7 @@ public class ExtensionTcpClient : IDisposable
             using var cts = new CancellationTokenSource();
             cts.CancelAfter(5000);
             await _client.ConnectAsync(address, port, cts.Token);
-            _acceptorCts = new();
             _stream = _client.GetStream();
-            if (_acceptorCts is not null && !_acceptorCts.IsCancellationRequested)
-            {
-                _acceptorCts?.Cancel();
-                _acceptorCts?.Dispose();
-                _acceptorCts = null;
-            }
             _ = Acceptor();
             return _client?.Connected ?? false;
         }
@@ -94,12 +98,6 @@ public class ExtensionTcpClient : IDisposable
             lock (_lock)
             {
                 _client?.Dispose();
-                if(_acceptorCts is not null && !_acceptorCts.IsCancellationRequested)
-                {
-                    _acceptorCts?.Cancel();
-                    _acceptorCts?.Dispose();
-                    _acceptorCts = null;
-                }
             }
             _client = null;
         }
@@ -160,6 +158,9 @@ public class ExtensionTcpClient : IDisposable
             lock (_lock)
             {
                 _serializer!.Serialize(message, (SerializerNetworkStreamIO)_stream!);
+#if DEBUG
+                Debug.WriteLine($"Sended Package", "ETcpClient");
+#endif
                 return true;
             }
         }
@@ -173,10 +174,16 @@ public class ExtensionTcpClient : IDisposable
     {
         try
         {
-            while (Connected && !_acceptorCts!.Token.IsCancellationRequested)
+            while (Connected)
             {
                 if (_stream!.DataAvailable)
-                    _serializer!.DeserializeToEvent((SerializerNetworkStreamIO)_stream!);
+                {
+                    var res =_serializer!.DeserializeToEvent((SerializerNetworkStreamIO)_stream!);
+
+#if DEBUG
+                    Debug.WriteLine($"Accept Package[{res}]", "ETcpClient");
+#endif
+                }
                 else
                     await Task.Delay(UpdateDelay);
             }
@@ -192,6 +199,13 @@ public class ExtensionTcpClient : IDisposable
             else
                 ClientDisconnected?.Invoke();
         }
+    }
+
+
+    public FTManager InitFT(int port)
+    {
+        var ftm = new FTManager(this, port);
+        return ftm;
     }
 
     private bool IsConnectedCheck()
@@ -236,11 +250,6 @@ public class ExtensionTcpClient : IDisposable
         SendNotRegisterType = null;
         AcceptNotRegisterType = null;
         TypeNotRegister = null;
-        if (_acceptorCts is not null && !_acceptorCts.IsCancellationRequested)
-        {
-            _acceptorCts?.Cancel();
-            _acceptorCts?.Dispose();
-            _acceptorCts = null;
-        }
+        GC.SuppressFinalize(this);
     }
 }
