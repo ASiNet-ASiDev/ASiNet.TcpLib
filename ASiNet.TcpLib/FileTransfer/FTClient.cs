@@ -250,7 +250,7 @@ public class FTClient : IDisposable
 
     public void Dispose()
     {
-        _client.Dispose();
+        _client?.Dispose();
         Changed = null;
         GC.SuppressFinalize(this);
     }

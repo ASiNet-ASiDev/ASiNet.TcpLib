@@ -170,9 +170,9 @@ public class FTManager : IDisposable
 
     public void Dispose()
     {
-        _client.Unsubscribe<PostFileRequest>(OnPostFileRequest);
+        _client?.Unsubscribe<PostFileRequest>(OnPostFileRequest);
 
-        _client.CloseHandler(_postHandler);
+        _client?.CloseHandler(_postHandler);
 
         _listener?.Dispose();
         foreach (var client in _activeClients)
